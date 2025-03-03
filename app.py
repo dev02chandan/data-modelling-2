@@ -1,9 +1,13 @@
 from openai import OpenAI
 import os
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
 
 api_key = os.getenv("OPENAI_API_KEY")
 # Initialize the OpenAI client
 # TODO: PLEASE INPUT OPENAI_API_KEY HERE
+# Or export it in the terminal
 client = OpenAI(api_key=api_key)
 
 import pandas as pd
@@ -1051,16 +1055,54 @@ if prompt := st.chat_input():
                                         zip_path = (
                                             f"{os.path.splitext(model_path)[0]}.zip"
                                         )
-
                                         with ZipFile(zip_path, "w") as zipf:
                                             zipf.write(
                                                 model_path, os.path.basename(model_path)
                                             )
-
                                         result["download_path"] = zip_path
 
-                                        del result["model"]
+                                        # --- Add Confusion Matrix Code Here ---
+                                        # Retrieve the model and test data
+                                        variable_name = arguments.get(
+                                            "variable_name", "default_dataset"
+                                        )
+                                        model = st.session_state.models.get(
+                                            f"{variable_name}_model"
+                                        )
+                                        if model:
+                                            prepared = st.session_state.prepared_data[
+                                                variable_name
+                                            ]
+                                            X_test = prepared["X_test"]
+                                            y_test = prepared["y_test"]
 
+                                            # Convert predictions to class labels
+                                            y_pred = np.argmax(
+                                                model.predict(X_test), axis=1
+                                            )
+
+                                            # Convert true labels based on encoding type
+                                            if prepared["label_encoding"] == "one-hot":
+                                                y_true = np.argmax(y_test, axis=1)
+                                            else:
+                                                y_true = (
+                                                    y_test.flatten()
+                                                    if y_test.ndim > 1
+                                                    else y_test
+                                                )
+
+                                            # Compute confusion matrix
+                                            cm = confusion_matrix(y_true, y_pred)
+
+                                            # Plot confusion matrix
+                                            fig, ax = plt.subplots()
+                                            ConfusionMatrixDisplay(
+                                                confusion_matrix=cm
+                                            ).plot(ax=ax)
+                                            st.pyplot(fig)
+                                        # --- End Confusion Matrix Code ---
+
+                                        del result["model"]
                                     function_response = result
                                 except Exception as e:
                                     function_response = {"error": str(e)}
